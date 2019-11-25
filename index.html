@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Consulta de Processos de 1º Grau</title>
+	<meta charset="utf-8" />
+	<link href="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+</head>
+<body>
+	<div class="container-fluid">
+		<div class="row">
+			<div class="col-sm-4">
+				<h4 id="title">
+					Consulta de Processos de 1º Grau
+				</h4>
+			</div>
+			<div class="col-sm-8 text-right" style="padding-top:10px;padding-bottom:10px;">
+				<input type="text" id="numProcesso" placeholder="Número do Processo">
+				<button id="btnFiltrar" class="btn btn-success btn-sm" onclick="consultar()">	
+					Consultar
+				</button>
+			</div>
+		</div>
+	</div>
+
+	<div class="container-fluid bg-white">
+		<div class="row">
+			<div class="col-sm-8">
+				<fieldset>
+					<legend>Movimentações</legend>
+					<ul class="timeline" id="movimentacoes"></ul>
+				</fieldset>
+			</div>
+			<div class="col-sm-4">
+				<fieldset>
+					<legend>Dados do processo</legend>
+					<p id="pDados"></p>
+				</fieldset>
+				<fieldset>
+					<legend>Partes do processo</legend>
+					<p id="pPartes"></p>
+				</fieldset>
+			</div>
+		</div>
+	</div>
+</body>
+<script type="text/javascript">
+
+	//Consulta processo no arquivo já crawleado
+	function consultar(){
+		
+		$('#numProcesso').val();
+		$('#movimentacoes, #pDados, #pPartes').html('');
+
+		var numProcesso = $('#numProcesso').val().replace(/[^0-9]/gi, ''); // Replace everything that is not a number with nothing
+		try{
+			$.get('service/consultas.txt')
+			.done(function(result) { 
+				if (result) {
+					var jsonConsultas = JSON.parse(result);
+					if (jsonConsultas.hasOwnProperty(numProcesso)) {
+
+						var dtAtualizacao = new Date(jsonConsultas[numProcesso].dataAtualizacao);
+						var dtAtual = new Date();
+						var timeDiff = Math.abs(dtAtual.getTime() - dtAtualizacao.getTime());
+						var timeDiffHours = Math.floor((timeDiff / (1000 * 60 * 60)));
+
+						if (timeDiffHours<=24) {
+							carregaPagina(jsonConsultas[numProcesso].dados);
+							return;
+						}
+					}
+				}
+					
+				// Se não encontrar, ou a data de atualização for > 24h, consultar site do tribunal
+				consultarSite();
+			
+			}).fail(function() { 
+				consultarSite();
+			})
+		} catch(e) {
+			consultarSite();
+		}
+	}
+
+	function consultarSite(){
+		var objectInput = {
+			numProcesso: $('#numProcesso').val()
+		};
+
+		$.post('service/index.php', $.param(objectInput), function( result ){
+			try{
+				var obj = JSON.parse(result);
+				carregaPagina(obj);
+
+			} catch(e) {
+				alert("Atenção! Ocorreu um erro durante a captura dos dados, por favor tente novamente.");
+				console.log(e);
+			}
+		})
+		.fail(function() {
+			alert("Atenção! Ocorreu um erro na requisição. Por favor verifique sua conexão e tente novamente.");
+		});
+	}
+
+	function carregaPagina(obj){
+		for (var i = 0; i < obj.movimentacoes.length; i++) {
+			
+			$('#movimentacoes').append(
+				'<li>'+
+					'<span class="mov-data">'+obj.movimentacoes[i].data+'</span>'+
+					'<p>'+obj.movimentacoes[i].movimento+'</p>'+
+				'</li>'
+			);
+		}
+
+		$('#pDados').html(obj.dadosProcesso);
+		$('#pPartes').html(obj.partes);
+	}
+</script>
+
+</html>
